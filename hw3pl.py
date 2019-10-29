@@ -115,6 +115,9 @@ def p_proposition_math(p):
             |    expression MINUSOP expression
             |    expression MULOP expression
             |    expression DIVOP expression
+            |    expression MODOP expression
+            |    expression INTDIVOP expression
+            |    expression EXPOP expression
     '''
     if p[2] == '+':
         p[0] = p[1] + p[3]
@@ -123,22 +126,29 @@ def p_proposition_math(p):
     elif p[2] == '*':
         p[0] = p[1] * p[3]
     elif p[2] == '/':
-        p[0] = p[1] / p[3]
+        p[0] = float(p[1] / p[3])
+    elif p[2] == 'mod':
+        p[0] = p[1] % p[3]
+    elif p[2] == 'div':
+        p[0] = int(p[1] / p[3])
+    elif p[2] == '**':
+        p[0] = pow(p[1], p[3])
 
 def p_proposition_number(p):
     '''
     expression : INTEGER
             |    REAL
+            |    BOOLEAN
     '''
     p[0] = p[1]
 
 def p_proposition_conjunction(p):
-    'expression : BOOLEAN CONJUNCTIONOP BOOLEAN'
-    p[0] = True if p[1] == 'True' and p[3] == 'True' else False
+    'expression : expression CONJUNCTIONOP expression'
+    p[0] = True if p[1] and p[3] else False
 
 def p_proposition_disjunction(p):
-    'expression : BOOLEAN DISJUNCTIONOP BOOLEAN'
-    p[0] = True if p[1] == 'True' or p[3] == 'True' else False
+    'expression : expression DISJUNCTIONOP expression'
+    p[0] = True if p[1] or p[3] else False
 
 def p_proposition_parenthetical(p):
     'expression : LPAREN expression RPAREN'
@@ -150,8 +160,9 @@ def p_proposition_brackets(p):
     
 # def p_proposition_list(p):
 #     '''
-#     statement : LBRACKET items RBRACKET
+#     expression : LBRACKET items RBRACKET
 #     '''
+    
 
 def p_error(p):
     print("SEMANTIC ERROR %s" % (p))
@@ -173,7 +184,7 @@ precedence = (
     ('left', 'MULOP', 'DIVOP'),
     ('right', 'EXPOP'),
     # a[b],
-    # #i(tuple)
+    # i(tuple),
     # tuple constructor,
     ('left', 'LPAREN', 'RPAREN'),
 )

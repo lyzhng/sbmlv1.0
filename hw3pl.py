@@ -38,7 +38,6 @@ tokens = (
 
 t_LPAREN = r'\('
 t_RPAREN = r'\)'
-t_HASH = r'\#'
 t_LBRACKET = r'\['
 t_RBRACKET = r'\]'
 t_DIVOP = r'\/'
@@ -69,6 +68,12 @@ def t_INTEGER(t):
     t.value = int(t.value)
     return t
 
+# Don't understand
+def t_HASH(t):
+    r'\#\([^\(\)]+\)'
+    t.value = t.value
+    return t
+
 # Fix me
 def t_REAL(t):
     r'testing'
@@ -97,84 +102,174 @@ def t_error(t):
 
 lexer = lex.lex()
 
-# Parsing rules
+## PARSING
 
-# Mathematical expression
+## General
 
-def p_proposition_expression(p):
-    'statement : expression SEMICOLON'
+def p_proposition_expr(p):
+    'statement : expr SEMICOLON'
     p[0] = p[1]
 
-def p_proposition_math(p):
-    '''
-    expression : expression PLUSOP expression
-            |    expression MINUSOP expression
-            |    expression MULOP expression
-            |    expression DIVOP expression
-            |    expression MODOP expression
-            |    expression INTDIVOP expression
-            |    expression EXPOP expression
-    '''
-    if p[2] == '+':
-        p[0] = p[1] + p[3]
-    elif p[2] == '-':
-        p[0] = p[1] - p[3]
-    elif p[2] == '*':
-        p[0] = p[1] * p[3]
-    elif p[2] == '/':
-        if p[3] == 0:
-            raise ZeroDivisionError
-        p[0] = float(p[1] / p[3])
-    elif p[2] == 'mod':
-        p[0] = p[1] % p[3]
-    elif p[2] == 'div':
-        if p[3] == 0:
-            raise ZeroDivisionError
-        p[0] = int(p[1] / p[3])
-    elif p[2] == '**':
-        p[0] = pow(p[1], p[3])
+def p_proposition_brackets(p):
+    'expr : LBRACKET expr RBRACKET'
+    p[0] = p[2]
 
-def p_propsition_not(p):
-    '''
-    expression : NOTOP expression
-    '''
-    for parse in p: 
-        print(parse)
-        
-    p[0] = not p[1]
+## Math
+
+def p_proposition_setmath(p):
+    'expr : math_expr'
+    p[0] = p[1]
 
 def p_proposition_number(p):
     '''
-    expression : INTEGER
-            |    REAL
-            |    BOOLEAN
+    math_expr : INTEGER
+              | REAL
     '''
     p[0] = p[1]
 
+def p_proposition_mathexpr(p):
+    'math_expr : LPAREN math_expr RPAREN'
+    p[0] = p[2]
+
+def p_proposition_plus(p):
+    'math_expr : math_expr PLUSOP math_expr'
+    p[0] = p[1] + p[3]
+    
+def p_proposition_minus(p):
+    'math_expr : math_expr MINUSOP math_expr'
+    p[0] = p[1] - p[3]
+
+def p_proposition_multiply(p):
+    'math_expr : math_expr MULOP math_expr'
+    p[0] = p[1] * p[3]
+
+def p_proposition_divide(p):
+    'math_expr : math_expr DIVOP math_expr'
+    if p[3] == 0:
+        raise ZeroDivisionError
+    p[0] = p[1] / p[3]
+    
+def p_proposition_intdiv(p):
+    'math_expr : math_expr INTDIVOP math_expr'
+    if p[3] == 0:
+        raise ZeroDivisionError
+    p[0] = int(p[1] / p[3])
+
+def p_proposition_mod(p):
+    'math_expr : math_expr MODOP math_expr'
+    p[0] = p[1] % p[3]
+    
+def p_proposition_exp(p):
+    'math_expr : math_expr EXPOP math_expr'
+    p[0] = pow(p[1], p[3])
+
+## Boolean
+
+def p_proposition_setbool(p):
+    'expr : bool_expr'
+    p[0] = p[1]
+
+def p_proposition_bool(p):
+    'bool_expr : BOOLEAN'
+    p[0] = p[1]
+
+def p_proposition_parenthetical(p):
+    'bool_expr : LPAREN bool_expr RPAREN'
+    p[0] = p[2]
+    
 def p_proposition_conjunction(p):
-    'expression : expression CONJUNCTIONOP expression'
+    'bool_expr : bool_expr CONJUNCTIONOP bool_expr'
     p[0] = True if p[1] and p[3] else False
 
 def p_proposition_disjunction(p):
-    'expression : expression DISJUNCTIONOP expression'
+    'bool_expr : bool_expr DISJUNCTIONOP bool_expr'
     p[0] = True if p[1] or p[3] else False
 
-def p_proposition_parenthetical(p):
-    'expression : LPAREN expression RPAREN'
-    p[0] = p[2]
+def p_propsition_not(p):
+    'bool_expr : NOTOP bool_expr' 
+    p[0] = not p[1]
+    
+## Strings
 
-def p_proposition_brackets(p):
-    'expression : LBRACKET expression RBRACKET'
+def p_proposition_setstr(p):
+    'expr : str_expr'
+    p[0] = p[1]
+    
+def p_proposition_str(p):
+    'str_expr : STRING'
+    p[0] = p[1]
+    
+def p_proposition_strparen(p):
+    'str_expr : LPAREN str_expr RPAREN'
     p[0] = p[2]
     
-# def p_proposition_list(p):
-#     '''
-#     expression : LBRACKET items RBRACKET
-#     '''
+def p_proposition_strconcat(p):
+    'str_expr : str_expr PLUSOP str_expr'
+    p[0] = p[1].strip('\'\"') + p[3].strip('\'\"')
+
+# Comparison
     
+# String comparison    
+   
+def p_proposition_setcmp(p):   
+    'expr : cmp_expr'
+    p[0] = p[1]
+    
+def p_proposition_streq(p):
+    'cmp_expr : str_expr EQOP str_expr'
+    p[0] = p[1] == p[3]
+    
+def p_proposition_strneq(p):
+    'cmp_expr : str_expr NEQOP str_expr'
+    p[0] = p[1] != p[3]
+    
+def p_proposition_strlt(p):
+    'cmp_expr : str_expr LTOP str_expr'
+    p[0] = p[1] < p[3]
+
+def p_proposition_strlte(p):
+    'cmp_expr : str_expr LTEOP str_expr'
+    p[0] = p[1] <= p[3]
+
+def p_proposition_strgt(p):
+    'cmp_expr : str_expr GTOP str_expr'
+    p[0] = p[1] > p[3]
+
+def p_proposition_strgte(p):
+    'cmp_expr : str_expr GTEOP str_expr'
+    p[0] = p[1] >= p[3]
+    
+# Math comparison
+
+def p_proposition_numeq(p):
+    'cmp_expr : math_expr EQOP math_expr'
+    p[0] = p[1] == p[3]
+    
+def p_proposition_numneq(p):
+    'cmp_expr : math_expr NEQOP math_expr'
+    p[0] = p[1] != p[3]
+    
+def p_proposition_numlt(p):
+    'cmp_expr : math_expr LTOP math_expr'
+    p[0] = p[1] < p[3]
+
+def p_proposition_numlte(p):
+    'cmp_expr : math_expr LTEOP math_expr'
+    p[0] = p[1] <= p[3]
+
+def p_proposition_numgt(p):
+    'cmp_expr : math_expr GTOP math_expr'
+    p[0] = p[1] > p[3]
+
+def p_proposition_numgte(p):
+    'cmp_expr : math_expr GTEOP math_expr'
+    p[0] = p[1] >= p[3]
+
+# Parsing error
 
 def p_error(p):
-    print("SEMANTIC ERROR %s" % (p))
+    print("SEMANTIC ERROR")
+    sys.exit()
 
 precedence = (
     ('left', 'GTOP'),

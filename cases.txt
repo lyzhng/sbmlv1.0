@@ -1,2 +1,5 @@
-- No spaces inbetween
-    - Input: 1+2+3
+- Input with no spaces inbetween
+    - Examples
+        1+2+3 
+
+- Real inputs

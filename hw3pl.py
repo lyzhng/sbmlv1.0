@@ -4,12 +4,6 @@ import sys
 import ply.lex as lex
 import ply.yacc as yacc
 
-def print_alot(p):
-    print("P:", p)
-    print("DIR:", dir(p))
-    print("SLICE", p.slice)
-    print("STACK", p.stack)
-
 tokens = (
     'INTEGER',
     'REAL',
@@ -39,6 +33,7 @@ tokens = (
     'GTOP',
     'CONCATOP',
     'COMMA',
+    'SEMICOLON'
 ) 
 
 t_LPAREN = r'\('
@@ -65,6 +60,7 @@ t_GTEOP = r'\>\='
 t_GTOP = r'\>'
 t_CONCATOP = r'\:{2}'
 t_COMMA = r'\,'
+t_SEMICOLON = r'\;'
 
 t_ignore = ' \t'
 
@@ -95,7 +91,7 @@ def t_newline(t):
     t.lexer.lineno += len(t.value)
 
 def t_error(t):
-    print("SYNTAX ERROR: %s at %d" % (t.value[0], t.lexer.lineno))
+    print("SYNTAX ERROR")
     t.lexer.skip(1)
     sys.exit()
 
@@ -106,7 +102,7 @@ lexer = lex.lex()
 # Mathematical expression
 
 def p_proposition_expression(p):
-    'statement : expression'
+    'statement : expression SEMICOLON'
     p[0] = p[1]
 
 def p_proposition_math(p):
@@ -126,13 +122,26 @@ def p_proposition_math(p):
     elif p[2] == '*':
         p[0] = p[1] * p[3]
     elif p[2] == '/':
+        if p[3] == 0:
+            raise ZeroDivisionError
         p[0] = float(p[1] / p[3])
     elif p[2] == 'mod':
         p[0] = p[1] % p[3]
     elif p[2] == 'div':
+        if p[3] == 0:
+            raise ZeroDivisionError
         p[0] = int(p[1] / p[3])
     elif p[2] == '**':
         p[0] = pow(p[1], p[3])
+
+def p_propsition_not(p):
+    '''
+    expression : NOTOP expression
+    '''
+    for parse in p: 
+        print(parse)
+        
+    p[0] = not p[1]
 
 def p_proposition_number(p):
     '''
@@ -166,7 +175,6 @@ def p_proposition_brackets(p):
 
 def p_error(p):
     print("SEMANTIC ERROR %s" % (p))
-    sys.exit()
 
 precedence = (
     ('left', 'GTOP'),
@@ -199,4 +207,4 @@ while True:
     if not s:
         continue
     result = parser.parse(s, debug=True)
-    print("RESULT:", result)
+    print("RESULT: %s" % result)

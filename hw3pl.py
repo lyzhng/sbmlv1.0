@@ -64,11 +64,10 @@ t_SEMICOLON = r'\;'
 t_ignore = ' \t'
 
 def t_INTEGER(t):
-    r'[+-]?[0-9]+'
+    r'[0-9]+'
     t.value = int(t.value)
     return t
 
-# Don't understand
 def t_HASH(t):
     r'\#\([^\(\)]+\)'
     t.value = t.value
@@ -107,14 +106,42 @@ lexer = lex.lex()
 ## General
 
 def p_proposition_expr(p):
-    'statement : expr SEMICOLON'
+    'stmt : expr SEMICOLON'
     p[0] = p[1]
 
 def p_proposition_brackets(p):
     'expr : LBRACKET expr RBRACKET'
     p[0] = p[2]
 
-## Math
+# Tuple
+
+# def p_proposition_settup(p):
+#     'expr : tup'
+#     p[0] = p[1]
+
+# def p_proposition_tupindex(p):
+#     'tupindex : HASH math_expr tup'
+
+# def p_proposition_tup(p):
+#     'tup : LPAREN items RPAREN'
+#     p[0] = p[2]
+    
+# def p_proposition_tupitems(p):
+#     '''
+#     items : items COMMA
+#           | item
+#     '''
+    
+# def p_proposition_tupitem(p):
+#     '''
+#     item : str_expr
+#          | bool_expr
+#          | math_expr
+#     '''
+
+## Types
+
+# Math
 
 def p_proposition_setmath(p):
     'expr : math_expr'
@@ -138,6 +165,10 @@ def p_proposition_plus(p):
 def p_proposition_minus(p):
     'math_expr : math_expr MINUSOP math_expr'
     p[0] = p[1] - p[3]
+
+def p_expression_uminus(p):
+    'math_expr : MINUSOP math_expr %prec UMINUS'
+    p[0] = -p[2]
 
 def p_proposition_multiply(p):
     'math_expr : math_expr MULOP math_expr'
@@ -163,7 +194,7 @@ def p_proposition_exp(p):
     'math_expr : math_expr EXPOP math_expr'
     p[0] = pow(p[1], p[3])
 
-## Boolean
+# Boolean
 
 def p_proposition_setbool(p):
     'expr : bool_expr'
@@ -187,9 +218,9 @@ def p_proposition_disjunction(p):
 
 def p_propsition_not(p):
     'bool_expr : NOTOP bool_expr' 
-    p[0] = not p[1]
+    p[0] = not p[2]
     
-## Strings
+# String
 
 def p_proposition_setstr(p):
     'expr : str_expr'
@@ -199,15 +230,11 @@ def p_proposition_str(p):
     'str_expr : STRING'
     p[0] = p[1]
     
-def p_proposition_strparen(p):
-    'str_expr : LPAREN str_expr RPAREN'
-    p[0] = p[2]
-    
 def p_proposition_strconcat(p):
     'str_expr : str_expr PLUSOP str_expr'
     p[0] = p[1].strip('\'\"') + p[3].strip('\'\"')
 
-# Comparison
+## Comparison
     
 # String comparison    
    
@@ -239,7 +266,7 @@ def p_proposition_strgte(p):
     'cmp_expr : str_expr GTEOP str_expr'
     p[0] = p[1] >= p[3]
     
-# Math comparison
+## Math comparison
 
 def p_proposition_numeq(p):
     'cmp_expr : math_expr EQOP math_expr'
@@ -272,23 +299,19 @@ def p_error(p):
     sys.exit()
 
 precedence = (
-    ('left', 'GTOP'),
-    ('left', 'GTEOP'),
-    ('left', 'NEQOP'),
-    ('left', 'EQOP'),
-    ('left', 'LTEOP'),
-    ('left', 'LTOP'),
-    ('left', 'CONJUNCTIONOP', 'DISJUNCTIONOP'),
+    ('left', 'DISJUNCTIONOP'),
+    ('left', 'CONJUNCTIONOP'),
     ('left', 'NOTOP'),
+    ('left', 'LTOP', 'GTOP', 'EQOP', 'LTEOP', 'GTEOP', 'NEQOP'),
     ('right', 'CONCATOP'),
     ('left', 'INOP'),
     ('left', 'PLUSOP', 'MINUSOP'),
-    ('left', 'INTDIVOP', 'MODOP'),
-    ('left', 'MULOP', 'DIVOP'),
+    ('left', 'MULOP', 'DIVOP', 'INTDIVOP', 'MODOP'),
     ('right', 'EXPOP'),
-    # a[b],
-    # i(tuple),
-    # tuple constructor,
+    ('right','UMINUS'),
+    ('left', 'COMMA'),
+    ('left', 'LBRACKET', 'RBRACKET'),
+    ('left', 'HASH'),
     ('left', 'LPAREN', 'RPAREN'),
 )
 

@@ -1,3 +1,5 @@
 parser.out
 parsetab.py
 .vscode
+.DS_Store
+__pycache__/

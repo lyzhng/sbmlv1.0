@@ -1,12 +1,12 @@
-- Tuple construction
+- Tuple construction with trailing comma
 
 - Lists
     - Concatenating lists
 
 - Indexing
+    [[1]];
+    [[1],2,3][0][0] + 40;
 
-- Mod
-
-- Div
+--------------------------------------------
 
 - Exceptions

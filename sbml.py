@@ -60,6 +60,7 @@ t_GTOP = r'\>'
 t_CONCATOP = r'\:{2}'
 t_COMMA = r'\,'
 t_SEMICOLON = r'\;'
+t_HASH = r'\#'
 
 t_ignore = ' \t'
 
@@ -85,11 +86,6 @@ def t_STRING(t):
     t.value = t.value[1:-1]
     return t
 
-def t_HASH(t):
-    r'\#\([^\(\)]+\)'
-    t.value = t.value
-    return t
-
 def t_newline(t):
     r'\n+'
     t.lexer.lineno += len(t.value)
@@ -99,6 +95,7 @@ def t_newline(t):
 def t_error(t):
     print("SYNTAX ERROR")
     t.lexer.skip(1)
+    sys.exit()
 
 lexer = lex.lex()
 
@@ -114,22 +111,67 @@ def p_proposition_brackets(p):
     'expr : LBRACKET expr RBRACKET'
     p[0] = p[2]
 
-## Tuple functions
 
-def p_proposition_settup(p):
+## List functions
+
+def p_proposition_setlist(p):
     '''
-    expr : tup
-         | tupindex
+    expr : list
+         | listindex
     '''
     p[0] = p[1]
 
+def p_proposition_index(p):
+    '''
+    listindex : str_expr listindex
+              | list listindex
+              | LBRACKET math_expr RBRACKET
+    '''
+    if type(p[3]) != int:
+        raise SemanticError()
+    p[0] = p[1][p[3]]
+
+def p_proposition_list(p):
+    'list : LBRACKET items RBRACKET'
+    p[0] = p[2]
+    
+def p_proposition_cons(p):
+    pass    
+    
+def p_proposition_listconcat(p):
+    'expr : list PLUSOP list'
+    p[0] = p[1] + p[3]
+
+def p_proposition_in(p):
+    '''
+    expr : str_expr INOP str_expr
+         | item INOP list
+    '''
+    p[0] = True if p[1] in p[3] else False
+
+    
+## Tuple functions
+
+def p_proposition_settup(p):
+    'expr : tupindex'
+    p[0] = p[1]
+
 def p_proposition_tupindex(p):
-    'tupindex : HASH math_expr tup'
-    p[0] = p[3][p[2]]
+    '''
+    tupindex : HASH math_expr tupindex
+             | tup
+    '''
+    if len(p) == 4:
+        if (p[2] > len(p[3]) or p[2] <= 0) or type(p[2]) != int:
+            raise SemanticError()
+        p[0] = p[3][p[2]-1]
+    else: 
+        p[0] = p[1]
 
 def p_proposition_tup(p):
     'tup : LPAREN items RPAREN'
-    p[0] = p[2]
+    p[0] = tuple(p[2])
+    print(p[0])
     
 def p_proposition_tupitems(p):
     'items : item'
@@ -145,8 +187,11 @@ def p_proposition_tupitem(p):
     item : str_expr
          | bool_expr
          | math_expr
+         | tupindex
+         | listindex
     '''
     p[0] = p[1]
+
 
 ## Math functions
 
@@ -154,52 +199,63 @@ def p_proposition_setmath(p):
     'expr : math_expr'
     p[0] = p[1]
 
-def p_proposition_number(p):
+def p_proposition_setnum(p):
     '''
     math_expr : INTEGER
               | REAL
     '''
     p[0] = p[1]
 
-def p_proposition_mathexpr(p):
+def p_proposition_mathparen(p):
     'math_expr : LPAREN math_expr RPAREN'
     p[0] = p[2]
 
-def p_proposition_plus(p):
+def p_proposition_mathplus(p):
     'math_expr : math_expr PLUSOP math_expr'
     p[0] = p[1] + p[3]
-    
-def p_proposition_minus(p):
+        
+def p_proposition_mathminus(p):
     'math_expr : math_expr MINUSOP math_expr'
+    if type(p[1]) != type(p[3]):
+        raise SemanticError()
     p[0] = p[1] - p[3]
 
-def p_expression_uminus(p):
+def p_proposition_uminus(p):
     'math_expr : MINUSOP math_expr %prec UMINUS'
     p[0] = -p[2]
 
-def p_proposition_multiply(p):
+def p_proposition_mathmul(p):
     'math_expr : math_expr MULOP math_expr'
+    if type(p[1]) != type(p[3]):
+        raise SemanticError()
     p[0] = p[1] * p[3]
-
-def p_proposition_divide(p):
+    
+def p_proposition_mathdiv(p):
     'math_expr : math_expr DIVOP math_expr'
+    if type(p[1]) != float and type(p[3]) != float:
+        raise SemanticError()
     if p[3] == 0:
         raise ZeroDivisionError
     p[0] = p[1] / p[3]
-    
+
 def p_proposition_intdiv(p):
     'math_expr : math_expr INTDIVOP math_expr'
+    if type(p[1]) != int and type(p[3]) != int:
+        raise SemanticError()
     if p[3] == 0:
         raise ZeroDivisionError
     p[0] = int(p[1] / p[3])
 
 def p_proposition_mod(p):
     'math_expr : math_expr MODOP math_expr'
+    if type(p[1]) != int and type(p[3]) != int:
+        raise SemanticError()
     p[0] = p[1] % p[3]
     
 def p_proposition_exp(p):
     'math_expr : math_expr EXPOP math_expr'
     p[0] = pow(p[1], p[3])
+
 
 ## Boolean functions
 
@@ -227,6 +283,7 @@ def p_propsition_not(p):
     'bool_expr : NOTOP bool_expr' 
     p[0] = not p[2]
     
+    
 ## String functions
 
 def p_proposition_setstr(p):
@@ -240,6 +297,7 @@ def p_proposition_str(p):
 def p_proposition_strconcat(p):
     'str_expr : str_expr PLUSOP str_expr'
     p[0] = p[1] + p[3]
+    
     
 ## String comparison    
    
@@ -331,4 +389,4 @@ while True:
     if not s:
         continue
     result = parser.parse(s, debug=True)
-    print("RESULT: %s" % result)
+    print(f"RESULT: {result}")

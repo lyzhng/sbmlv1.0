@@ -3,6 +3,8 @@
 import sys
 import ply.lex as lex
 import ply.yacc as yacc
+from exceptions import SemanticError, SyntaxError
+from sys import argv
 
 tokens = (
     'INTEGER',
@@ -31,7 +33,7 @@ tokens = (
     'NEQOP',
     'GTEOP',
     'GTOP',
-    'CONCATOP',
+    'CONSOP',
     'COMMA',
     'SEMICOLON'
 ) 
@@ -57,7 +59,7 @@ t_EQOP = r'\={2}'
 t_NEQOP = r'\<\>'
 t_GTEOP = r'\>\='
 t_GTOP = r'\>'
-t_CONCATOP = r'\:{2}'
+t_CONSOP = r'\:{2}'
 t_COMMA = r'\,'
 t_SEMICOLON = r'\;'
 t_HASH = r'\#'
@@ -93,9 +95,8 @@ def t_newline(t):
 ## Lexing error
 
 def t_error(t):
-    print("SYNTAX ERROR")
     t.lexer.skip(1)
-    sys.exit()
+    raise SyntaxError()
 
 lexer = lex.lex()
 
@@ -107,97 +108,117 @@ def p_proposition_expr(p):
     'stmt : expr SEMICOLON'
     p[0] = p[1]
 
-def p_proposition_brackets(p):
-    'expr : LBRACKET expr RBRACKET'
-    p[0] = p[2]
-
+def p_proposition_add(p):
+    'list : list PLUSOP list'
+    if type(p[1]) != type(p[3]):
+        raise SemanticError()
+    p[0] = p[1] + p[3]
 
 ## List functions
 
-def p_proposition_setlist(p):
+def p_proposition_setter(p):
     '''
     expr : list
-         | listindex
+         | cmp_expr
+         | bool_expr
+         | math_expr
+         | str_expr
+         | tupindex
     '''
     p[0] = p[1]
 
 def p_proposition_index(p):
     '''
-    listindex : str_expr listindex
-              | list listindex
-              | LBRACKET math_expr RBRACKET
+    listindex : str_expr listindextail
+              | list listindextail
     '''
-    if type(p[3]) != int:
+    if type(p[2]) != int:
         raise SemanticError()
-    p[0] = p[1][p[3]]
+    p[0] = p[1][p[2]]
+
+def p_proposition_indextail(p):
+    '''
+    listindextail : LBRACKET math_expr RBRACKET
+    '''
+    if type(p[2]) != int:
+        raise SemanticError()
+    p[0] = p[2]
+
 
 def p_proposition_list(p):
-    'list : LBRACKET items RBRACKET'
-    p[0] = p[2]
+    '''
+    list : LBRACKET items RBRACKET
+         | listindex
+         | LBRACKET RBRACKET
+    '''
+    if len(p) == 4:
+        p[0] = p[2]
+    elif len(p) == 3:
+        p[0] = [];
+    else:
+        p[0] = p[1]
     
 def p_proposition_cons(p):
-    pass    
+    '''
+    expr : list CONSOP list
+         | math_expr CONSOP list
+         | str_expr CONSOP list
+         | bool_expr CONSOP list
+    '''
+    p[0] = [p[1]] + p[3]
     
-def p_proposition_listconcat(p):
-    'expr : list PLUSOP list'
-    p[0] = p[1] + p[3]
-
 def p_proposition_in(p):
     '''
-    expr : str_expr INOP str_expr
-         | item INOP list
+    cmp_expr : str_expr INOP str_expr
+             | item INOP list
     '''
-    p[0] = True if p[1] in p[3] else False
+    p[0] = p[1] in p[3]
 
     
 ## Tuple functions
 
-def p_proposition_settup(p):
-    'expr : tupindex'
-    p[0] = p[1]
-
 def p_proposition_tupindex(p):
     '''
-    tupindex : HASH math_expr tupindex
-             | tup
+    tupindex : HASH INTEGER LPAREN tupindex RPAREN
+             | HASH INTEGER tup
     '''
-    if len(p) == 4:
-        if (p[2] > len(p[3]) or p[2] <= 0) or type(p[2]) != int:
+    if len(p) > 4:
+        if p[2] > len(p[4]) or p[2] <= 0:
             raise SemanticError()
-        p[0] = p[3][p[2]-1]
+        p[0] = p[4][p[2]-1]
     else: 
-        p[0] = p[1]
+        p[0] = p[3][p[2]-1]
 
 def p_proposition_tup(p):
-    'tup : LPAREN items RPAREN'
-    p[0] = tuple(p[2])
-    print(p[0])
+    '''
+    tup : LPAREN items RPAREN
+    '''
     
-def p_proposition_tupitems(p):
-    'items : item'
-    p[0] = [p[1]]
+    p[0] = tuple(p[2])
     
 def p_proposition_tuptail(p):
-    'items : items COMMA item'
-    p[0] = p[1]
-    p[0] += [p[3]]
+    '''
+    items : item COMMA items
+          | item COMMA 
+          | item
+    '''
+    if len(p) == 4:
+        p[0] = [p[1]] + p[3]
+    else:
+        p[0] = [p[1]]
 
 def p_proposition_tupitem(p):
     '''
-    item : str_expr
-         | bool_expr
+    item : bool_expr
          | math_expr
-         | tupindex
-         | listindex
+         | tup
+         | str_expr
+         | list
     '''
     p[0] = p[1]
 
 
 ## Math functions
-
-def p_proposition_setmath(p):
-    'expr : math_expr'
-    p[0] = p[1]
 
 def p_proposition_setnum(p):
     '''
@@ -259,10 +280,6 @@ def p_proposition_exp(p):
 
 ## Boolean functions
 
-def p_proposition_setbool(p):
-    'expr : bool_expr'
-    p[0] = p[1]
-
 def p_proposition_bool(p):
     'bool_expr : BOOLEAN'
     p[0] = p[1]
@@ -273,23 +290,22 @@ def p_proposition_parenthetical(p):
     
 def p_proposition_conjunction(p):
     'bool_expr : bool_expr CONJUNCTIONOP bool_expr'
-    p[0] = True if p[1] and p[3] else False
+    p[0] = p[1] and p[3]
 
 def p_proposition_disjunction(p):
     'bool_expr : bool_expr DISJUNCTIONOP bool_expr'
-    p[0] = True if p[1] or p[3] else False
+    p[0] = p[1] or p[3]
 
 def p_propsition_not(p):
-    'bool_expr : NOTOP bool_expr' 
+    '''
+    bool_expr : NOTOP bool_expr
+              | NOTOP cmp_expr
+    ''' 
     p[0] = not p[2]
     
     
 ## String functions
 
-def p_proposition_setstr(p):
-    'expr : str_expr'
-    p[0] = p[1]
-    
 def p_proposition_str(p):
     'str_expr : STRING'
     p[0] = p[1]
@@ -298,12 +314,7 @@ def p_proposition_strconcat(p):
     'str_expr : str_expr PLUSOP str_expr'
     p[0] = p[1] + p[3]
     
-    
 ## String comparison    
-   
-def p_proposition_setcmp(p):   
-    'expr : cmp_expr'
-    p[0] = p[1]
     
 def p_proposition_streq(p):
     'cmp_expr : str_expr EQOP str_expr'
@@ -358,8 +369,8 @@ def p_proposition_numgte(p):
 ## Parsing error
 
 def p_error(p):
+    # raise SemanticError()
     print("SEMANTIC ERROR")
-    print(f"p.value: {p.value}")
     sys.exit()
 
 precedence = (
@@ -367,7 +378,7 @@ precedence = (
     ('left', 'CONJUNCTIONOP'),
     ('left', 'NOTOP'),
     ('left', 'LTOP', 'GTOP', 'EQOP', 'LTEOP', 'GTEOP', 'NEQOP'),
-    ('right', 'CONCATOP'),
+    ('right', 'CONSOP'),
     ('left', 'INOP'),
     ('left', 'PLUSOP', 'MINUSOP'),
     ('left', 'MULOP', 'DIVOP', 'INTDIVOP', 'MODOP'),
@@ -390,3 +401,14 @@ while True:
         continue
     result = parser.parse(s, debug=True)
     print(f"RESULT: {result}")
+
+# with open(argv[1], 'r') as file:
+#     for line in file:
+#         try:
+#             result = parser.parse(line, debug=False)
+#             print(result)
+#         except EOFError:
+#             break
+#         except (SemanticError, SyntaxError) as err:
+#             print(err)
+#             continue

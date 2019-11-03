@@ -1,12 +1,7 @@
-- Tuple construction with trailing comma
-
-- Lists
-    - Concatenating lists
-
 - Indexing
-    [[1]];
     [[1],2,3][0][0] + 40;
+    #1(#1((1,2),3,4)) + 1;
 
---------------------------------------------
+- What can be in the lists? Any expression?
 
-- Exceptions
+- 1.e3 == 1000;

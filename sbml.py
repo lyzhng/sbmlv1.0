@@ -69,7 +69,7 @@ t_ignore = ' \t'
 ## Data types
 
 def t_REAL(t):
-    r'(([-]?([0-9]+\.[0-9]*)|([0-9]*\.[0-9]+)([eE][-]?[0-9]+)?))'
+    r'(([-]?([0-9]+\.[0-9]*)|([0-9]*\.[0-9]+))([eE][-]?[0-9]+)?)'
     t.value = float(t.value)
     return t
 
@@ -104,267 +104,201 @@ lexer = lex.lex()
 
 ## General
 
-def p_proposition_expr(p):
+def p_expr(p):
     'stmt : expr SEMICOLON'
     p[0] = p[1]
-
-def p_proposition_add(p):
-    'list : list PLUSOP list'
-    if type(p[1]) != type(p[3]):
-        raise SemanticError()
-    p[0] = p[1] + p[3]
-
-## List functions
-
-def p_proposition_setter(p):
+    
+def p_listitem(p):
+    'listitem : expr'
+    p[0] = [p[1]]
+    
+def p_listitems(p):
     '''
-    expr : list
-         | cmp_expr
-         | bool_expr
-         | math_expr
-         | str_expr
-         | tupindex
+    listitems : listitems COMMA listitem
+              | listitem
     '''
-    p[0] = p[1]
-
-def p_proposition_index(p):
+    if len(p) == 2:
+        p[0] = p[1]
+    else:
+        p[0] = p[1] + p[3]
+    
+def p_list(p):
     '''
-    listindex : str_expr listindextail
-              | list listindextail
-    '''
-    if type(p[2]) != int:
-        raise SemanticError()
-    p[0] = p[1][p[2]]
-
-def p_proposition_indextail(p):
-    '''
-    listindextail : LBRACKET math_expr RBRACKET
-    '''
-    if type(p[2]) != int:
-        raise SemanticError()
-    p[0] = p[2]
-
-
-def p_proposition_list(p):
-    '''
-    list : LBRACKET items RBRACKET
-         | listindex
+    list : LBRACKET listitems RBRACKET
          | LBRACKET RBRACKET
     '''
     if len(p) == 4:
         p[0] = p[2]
-    elif len(p) == 3:
-        p[0] = [];
     else:
-        p[0] = p[1]
+        p[0] = []    
     
-def p_proposition_cons(p):
+def p_tuple(p):
     '''
-    expr : list CONSOP list
-         | math_expr CONSOP list
-         | str_expr CONSOP list
-         | bool_expr CONSOP list
+    tup : LPAREN tupitems RPAREN
     '''
-    p[0] = [p[1]] + p[3]
+    p[0] = p[2]    
     
-def p_proposition_in(p):
-    '''
-    cmp_expr : str_expr INOP str_expr
-             | item INOP list
-    '''
-    p[0] = p[1] in p[3]
-
+def p_tupitem(p):
+    'tupitem : expr'
+    p[0] = [p[1]]
     
-## Tuple functions
-
-def p_proposition_tupindex(p):
+def p_tupitems(p):
+    '''
+    tupitems : tupitems COMMA tupitem
+             | tupitems COMMA
+             | tupitem
+    '''
+    if len(p) == 2:
+        p[0] = tuple(p[1])
+    elif len(p) == 3:
+        p[0] = tuple(p[1])
+    else:
+        p[0] = tuple(p[1]) + tuple(p[3])
+    
+def p_tupindex(p):
     '''
     tupindex : HASH INTEGER LPAREN tupindex RPAREN
              | HASH INTEGER tup
     '''
-    if len(p) > 4:
-        if p[2] > len(p[4]) or p[2] <= 0:
-            raise SemanticError()
+    if len(p) == 6 and (p[2] <= 0 or p[2] > len(p[4])): 
+        raise SemanticError()
+    if len(p) == 6:
         p[0] = p[4][p[2]-1]
-    else: 
+    else:
         p[0] = p[3][p[2]-1]
 
-def p_proposition_tup(p):
+def p_genindex(p):
     '''
-    tup : LPAREN items RPAREN
+    listindex : list LBRACKET expr RBRACKET
+              | expr LBRACKET expr RBRACKET
     '''
-    
-    p[0] = tuple(p[2])
-    
-def p_proposition_tuptail(p):
-    '''
-    items : item COMMA items
-          | item COMMA 
-          | item
-    '''
-    if len(p) == 4:
-        p[0] = [p[1]] + p[3]
-    else:
-        p[0] = [p[1]]
-
-def p_proposition_tupitem(p):
-    '''
-    item : bool_expr
-         | math_expr
-         | tup
-         | str_expr
-         | list
-    '''
-    p[0] = p[1]
-
-
-## Math functions
-
-def p_proposition_setnum(p):
-    '''
-    math_expr : INTEGER
-              | REAL
-    '''
-    p[0] = p[1]
-
-def p_proposition_mathparen(p):
-    'math_expr : LPAREN math_expr RPAREN'
-    p[0] = p[2]
-
-def p_proposition_mathplus(p):
-    'math_expr : math_expr PLUSOP math_expr'
-    p[0] = p[1] + p[3]
-        
-def p_proposition_mathminus(p):
-    'math_expr : math_expr MINUSOP math_expr'
-    if type(p[1]) != type(p[3]):
+    if p[3] < 0 or p[3] >= len(p[1]): 
         raise SemanticError()
-    p[0] = p[1] - p[3]
+    if _valid_types([p[3]], [int]):
+        p[0] = p[1][p[3]]
+    
+def p_term(p):
+    '''
+    expr : STRING
+         | INTEGER
+         | REAL
+         | BOOLEAN
+         | list
+         | tup
+         | listindex
+         | tupindex
+    '''
+    p[0] = p[1]
 
-def p_proposition_uminus(p):
-    'math_expr : MINUSOP math_expr %prec UMINUS'
+def p_uminus(p):
+    'expr : MINUSOP expr %prec UMINUS'
     p[0] = -p[2]
 
-def p_proposition_mathmul(p):
-    'math_expr : math_expr MULOP math_expr'
-    if type(p[1]) != type(p[3]):
-        raise SemanticError()
-    p[0] = p[1] * p[3]
-    
-def p_proposition_mathdiv(p):
-    'math_expr : math_expr DIVOP math_expr'
-    if type(p[1]) != float and type(p[3]) != float:
-        raise SemanticError()
-    if p[3] == 0:
-        raise ZeroDivisionError
-    p[0] = p[1] / p[3]
-
-def p_proposition_intdiv(p):
-    'math_expr : math_expr INTDIVOP math_expr'
-    if type(p[1]) != int and type(p[3]) != int:
-        raise SemanticError()
-    if p[3] == 0:
-        raise ZeroDivisionError
-    p[0] = int(p[1] / p[3])
-
-def p_proposition_mod(p):
-    'math_expr : math_expr MODOP math_expr'
-    if type(p[1]) != int and type(p[3]) != int:
-        raise SemanticError()
-    p[0] = p[1] % p[3]
-    
-def p_proposition_exp(p):
-    'math_expr : math_expr EXPOP math_expr'
-    p[0] = pow(p[1], p[3])
-
-
-## Boolean functions
-
-def p_proposition_bool(p):
-    'bool_expr : BOOLEAN'
-    p[0] = p[1]
-
-def p_proposition_parenthetical(p):
-    'bool_expr : LPAREN bool_expr RPAREN'
-    p[0] = p[2]
-    
-def p_proposition_conjunction(p):
-    'bool_expr : bool_expr CONJUNCTIONOP bool_expr'
-    p[0] = p[1] and p[3]
-
-def p_proposition_disjunction(p):
-    'bool_expr : bool_expr DISJUNCTIONOP bool_expr'
-    p[0] = p[1] or p[3]
-
-def p_propsition_not(p):
+def p_binop(p):
     '''
-    bool_expr : NOTOP bool_expr
-              | NOTOP cmp_expr
-    ''' 
-    p[0] = not p[2]
-    
-    
-## String functions
-
-def p_proposition_str(p):
-    'str_expr : STRING'
-    p[0] = p[1]
-    
-def p_proposition_strconcat(p):
-    'str_expr : str_expr PLUSOP str_expr'
-    p[0] = p[1] + p[3]
-    
-## String comparison    
-    
-def p_proposition_streq(p):
-    'cmp_expr : str_expr EQOP str_expr'
-    p[0] = p[1] == p[3]
-    
-def p_proposition_strneq(p):
-    'cmp_expr : str_expr NEQOP str_expr'
-    p[0] = p[1] != p[3]
-    
-def p_proposition_strlt(p):
-    'cmp_expr : str_expr LTOP str_expr'
-    p[0] = p[1] < p[3]
-
-def p_proposition_strlte(p):
-    'cmp_expr : str_expr LTEOP str_expr'
-    p[0] = p[1] <= p[3]
-
-def p_proposition_strgt(p):
-    'cmp_expr : str_expr GTOP str_expr'
-    p[0] = p[1] > p[3]
-
-def p_proposition_strgte(p):
-    'cmp_expr : str_expr GTEOP str_expr'
-    p[0] = p[1] >= p[3]
-    
-## Math comparison
-
-def p_proposition_numeq(p):
-    'cmp_expr : math_expr EQOP math_expr'
-    p[0] = p[1] == p[3]
-    
-def p_proposition_numneq(p):
-    'cmp_expr : math_expr NEQOP math_expr'
-    p[0] = p[1] != p[3]
-    
-def p_proposition_numlt(p):
-    'cmp_expr : math_expr LTOP math_expr'
-    p[0] = p[1] < p[3]
-
-def p_proposition_numlte(p):
-    'cmp_expr : math_expr LTEOP math_expr'
-    p[0] = p[1] <= p[3]
-
-def p_proposition_numgt(p):
-    'cmp_expr : math_expr GTOP math_expr'
-    p[0] = p[1] > p[3]
-
-def p_proposition_numgte(p):
-    'cmp_expr : math_expr GTEOP math_expr'
-    p[0] = p[1] >= p[3]
+    expr : expr PLUSOP expr
+         | expr MINUSOP expr
+         | expr MULOP expr
+         | expr DIVOP expr
+         | expr INTDIVOP expr
+         | expr MODOP expr
+         | expr EXPOP expr
+         | expr CONJUNCTIONOP expr
+         | expr DISJUNCTIONOP expr
+         | expr INOP expr
+         | expr CONSOP expr
+    '''
+    if p[2] == '+':
+        both_numbers = _valid_types([p[1], p[3]], [int, float])
+        both_strings = _valid_types([p[1], p[3]], [str])
+        both_lists = _valid_types([p[1], p[3]], [list])
+        if both_numbers or both_strings or both_lists:
+            p[0] = p[1] + p[3]
+            return
+    elif p[2] == '-':
+        if _valid_types([p[1], p[3]], [int]):
+            p[0] = p[1] - p[3]
+            return
+        elif _valid_types([p[1], p[3]], [float]):
+            p[0] = p[1] - p[3]
+            return
+    elif p[2] == '*':
+        if _valid_types([p[1], p[3]], [int]):
+            p[0] = p[1] * p[3]
+            return
+        elif _valid_types([p[1], p[3]], [float]):
+            p[0] = p[1] * p[3]
+            return
+    elif p[2] == '/':
+        if _valid_types([p[1], p[3]], [int]):
+            p[0] = p[1] / p[3]
+            return
+        elif _valid_types([p[1], p[3]], [float]):
+            p[0] = p[1] / p[3]
+            return
+    elif p[2] == 'div':
+        if _valid_types([p[1], p[3]], [int]):
+            p[0] = p[1] // p[3]
+            return
+    elif p[2] == 'mod':
+        if _valid_types([p[1], p[3]], [int]):
+            p[0] = p[1] % p[3]
+            return
+    elif p[2] == '**':
+        if _valid_types([p[1], p[3]], [int, float]):
+            p[0] = pow(p[1], p[3])  
+            return  
+    elif p[2] == 'andalso':
+        if _valid_types([p[1], p[3]], [bool]):
+            p[0] = p[1] and p[3]
+            return
+    elif p[2] == 'orelse':
+        if _valid_types([p[1], p[3]], [bool]):
+            p[0] = p[1] or p[3]
+            return
+    elif p[2] == 'in':
+        if (_valid_types([p[1]], [int, float, bool, str, list, tuple]) and _valid_types([p[3]], [list])) or _valid_types([p[1], p[3]], [str]):
+            p[0] = p[1] in p[3]
+            return
+    elif p[2] == '::':
+        if _valid_types([p[1]], [int, float, bool, str, list, tuple]) and _valid_types([p[3]], [list]):
+            p[0] = [p[1]] + p[3]
+            return
+    raise SemanticError()
+           
+def p_not(p):
+    'expr : NOTOP expr'
+    p[0] = not p[2] 
+       
+def p_comparison(p):
+    '''
+    expr : expr EQOP expr
+         | expr NEQOP expr
+         | expr GTOP expr
+         | expr GTEOP expr
+         | expr LTOP expr
+         | expr LTEOP expr
+    '''        
+    if _valid_types([p[1], p[3]], [int, float]) or _valid_types([p[1], p[3]], [str]):
+        if p[2] == '==':
+            p[0] = p[1] == p[3]
+        elif p[2] == '<>':
+            p[0] = p[1] != p[3]
+        elif p[2] == '>':
+            p[0] = p[1] > p[3]
+        elif p[2] == '>=':
+            p[0] = p[1] >= p[3]
+        elif p[2] == '<':
+            p[0] = p[1] < p[3]
+        elif p[2] == '<=':
+            p[0] = p[1] <= p[3]                           
+        return
+    raise SemanticError()
+def _valid_types(arguments, types):
+    for arg in arguments:
+        if type(arg) not in types:
+            return False
+    return True
 
 ## Parsing error
 
@@ -372,6 +306,8 @@ def p_error(p):
     # raise SemanticError()
     print("SEMANTIC ERROR")
     sys.exit()
+
+## Precedence
 
 precedence = (
     ('left', 'DISJUNCTIONOP'),

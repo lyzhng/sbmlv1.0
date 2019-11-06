@@ -6,6 +6,8 @@ import ply.yacc as yacc
 from exceptions import SemanticError, SyntaxError
 from sys import argv
 
+DEBUG = len(sys.argv) > 1 and sys.argv[1] == "--debug"
+
 tokens = (
     'INTEGER',
     'REAL',
@@ -97,7 +99,7 @@ def t_newline(t):
 def t_error(t):
     t.lexer.skip(1)
     raise SyntaxError()
-
+    
 lexer = lex.lex()
 
 ## PARSING
@@ -132,12 +134,24 @@ def p_list(p):
     else:
         p[0] = []    
     
-def p_tuple(p):
+def p_paren(p):
     '''
-    tup : LPAREN tupitems RPAREN
+    expr : LPAREN expr RPAREN
     '''
     p[0] = p[2]    
     
+def p_tuple(p):
+    '''
+    tup : LPAREN tupitems RPAREN
+        | LPAREN RPAREN
+    '''
+    if len(p) == 3:
+        p[0] = ()
+    elif len(p) == 4:
+        p[0] = tuple(p[2])
+    elif len(p[2]) == 1:
+        p[0] = p[2][0]
+                
 def p_tupitem(p):
     'tupitem : expr'
     p[0] = [p[1]]
@@ -149,11 +163,11 @@ def p_tupitems(p):
              | tupitem
     '''
     if len(p) == 2:
-        p[0] = tuple(p[1])
+        p[0] = p[1]
     elif len(p) == 3:
-        p[0] = tuple(p[1])
+        p[0] = p[1]
     else:
-        p[0] = tuple(p[1]) + tuple(p[3])
+        p[0] = p[1] + p[3]
     
 def p_tupindex(p):
     '''
@@ -174,7 +188,7 @@ def p_genindex(p):
     '''
     if p[3] < 0 or p[3] >= len(p[1]): 
         raise SemanticError()
-    if _valid_types([p[3]], [int]):
+    if _valid_types([p[3]], [int]) and _valid_types([p[1]], [list, str]):
         p[0] = p[1][p[3]]
     
 def p_term(p):
@@ -216,28 +230,23 @@ def p_binop(p):
             p[0] = p[1] + p[3]
             return
     elif p[2] == '-':
-        if _valid_types([p[1], p[3]], [int]):
-            p[0] = p[1] - p[3]
-            return
-        elif _valid_types([p[1], p[3]], [float]):
+        if _valid_types([p[1], p[3]], [int, float]):
             p[0] = p[1] - p[3]
             return
     elif p[2] == '*':
-        if _valid_types([p[1], p[3]], [int]):
-            p[0] = p[1] * p[3]
-            return
-        elif _valid_types([p[1], p[3]], [float]):
+        if _valid_types([p[1], p[3]], [int, float]):
             p[0] = p[1] * p[3]
             return
     elif p[2] == '/':
-        if _valid_types([p[1], p[3]], [int]):
-            p[0] = p[1] / p[3]
-            return
-        elif _valid_types([p[1], p[3]], [float]):
+        if p[3] == 0:
+            raise ZeroDivisionError
+        if _valid_types([p[1], p[3]], [int, float]):
             p[0] = p[1] / p[3]
             return
     elif p[2] == 'div':
         if _valid_types([p[1], p[3]], [int]):
+            if p[3] == 0:
+                raise ZeroDivisionError
             p[0] = p[1] // p[3]
             return
     elif p[2] == 'mod':
@@ -294,6 +303,8 @@ def p_comparison(p):
             p[0] = p[1] <= p[3]                           
         return
     raise SemanticError()
+
+
 def _valid_types(arguments, types):
     for arg in arguments:
         if type(arg) not in types:
@@ -303,9 +314,9 @@ def _valid_types(arguments, types):
 ## Parsing error
 
 def p_error(p):
-    # raise SemanticError()
-    print("SEMANTIC ERROR")
-    sys.exit()
+    raise SemanticError()
+    # print("SEMANTIC ERROR")
+    # sys.exit()
 
 ## Precedence
 
@@ -313,16 +324,16 @@ precedence = (
     ('left', 'DISJUNCTIONOP'),
     ('left', 'CONJUNCTIONOP'),
     ('left', 'NOTOP'),
-    ('left', 'LTOP', 'GTOP', 'EQOP', 'LTEOP', 'GTEOP', 'NEQOP'),
+    ('left', 'LTOP', 'LTEOP', 'EQOP', 'NEQOP', 'GTEOP', 'GTOP'),
     ('right', 'CONSOP'),
     ('left', 'INOP'),
     ('left', 'PLUSOP', 'MINUSOP'),
     ('left', 'MULOP', 'DIVOP', 'INTDIVOP', 'MODOP'),
     ('right', 'EXPOP'),
     ('right','UMINUS'),
-    ('left', 'COMMA'),
     ('left', 'LBRACKET', 'RBRACKET'),
     ('left', 'HASH'),
+    ('left', 'COMMA'),
     ('left', 'LPAREN', 'RPAREN'),
 )
 
@@ -341,10 +352,10 @@ while True:
 # with open(argv[1], 'r') as file:
 #     for line in file:
 #         try:
-#             result = parser.parse(line, debug=False)
+#             result = parser.parse(line, debug=DEBUG)
 #             print(result)
 #         except EOFError:
 #             break
-#         except (SemanticError, SyntaxError) as err:
+#         except (SemanticError, SyntaxError, IndexError, ZeroDivisionError) as err:
 #             print(err)
 #             continue

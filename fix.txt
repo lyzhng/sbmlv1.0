@@ -1,7 +1,3 @@
-- Indexing
-    [[1],2,3][0][0] + 40;
-    #1(#1((1,2),3,4)) + 1;
-
-- What can be in the lists? Any expression?
-
-- 1.e3 == 1000;
+- Does division always return a float?
+- Write own exception classes? How far?
+- Negative indexing.

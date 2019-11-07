@@ -121,9 +121,7 @@ def p_expr(p):
     p[0] = p[1]    
     
 def p_paren(p):
-    '''
-    expr : LPAREN expr RPAREN
-    '''
+    'expr : LPAREN expr RPAREN'
     p[0] = p[2]      
     
 ## Wherever expr leads to... terminals and nested expressions 

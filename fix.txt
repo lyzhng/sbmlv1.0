@@ -1,3 +1,0 @@
-- Does division always return a float?
-- Write own exception classes? How far?
-- Negative indexing.
